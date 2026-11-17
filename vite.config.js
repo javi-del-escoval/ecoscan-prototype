@@ -12,9 +12,13 @@ export default defineConfig({
         name: 'EcoScan',
         short_name: 'EcoScan',
         description: 'Prototipo demostrativo de EcoScan. Datos de ejemplo.',
+        id: '/',
         start_url: '/',
         scope: '/',
         display: 'standalone',
+        // Si la app está instalada, abrir el enlace del demo la abre en la ventana instalada
+        handle_links: 'preferred',
+        launch_handler: { client_mode: ['navigate-existing', 'auto'] },
         lang: 'es',
         theme_color: '#176B4D',
         background_color: '#F6F8F5',

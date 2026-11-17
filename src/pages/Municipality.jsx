@@ -17,7 +17,7 @@ export function ActivityList({ items, limit }) {
         <li key={h.id} className="row-item">
           <div>
             <strong>{h.material}</strong>
-            <div className="muted">{formatDateTime(h.date)} · {h.user} · Confianza simulada {h.confidence}%</div>
+            <div className="muted">{formatDateTime(h.date)} · {h.user} · Confianza {h.confidence}%</div>
           </div>
           <Badge>{h.status}</Badge>
         </li>

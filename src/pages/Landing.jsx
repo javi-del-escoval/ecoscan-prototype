@@ -38,14 +38,14 @@ export default function Landing({ canInstall, onInstall }) {
             <button className="btn btn--primary btn--lg" onClick={() => go('/demo')}>Explorar demo</button>
             <button className="btn btn--outline btn--lg" onClick={() => scrollTo('como')}>Cómo funciona</button>
           </div>
-          <p className="small">Prototipo demostrativo. Las identificaciones y ubicaciones mostradas son datos de ejemplo.</p>
+          <p className="small">Prototipo demostrativo. Las identificaciones las estima un modelo de visión en tu navegador y pueden fallar; las ubicaciones son datos de ejemplo.</p>
         </div>
         <div className="hero__card" aria-hidden="true">
           <div className="mock">
             <div className="mock__img">♺</div>
             <strong>Plástico PET</strong>
             <div className="mock__meter"><span style={{ width: '96%' }} /></div>
-            <small>Confianza simulada 96%</small>
+            <small>Confianza del modelo 96%</small>
             <span className="badge badge--ok">Reciclable</span>
             <small className="muted">Ejemplo ilustrativo</small>
           </div>
@@ -80,7 +80,7 @@ export default function Landing({ canInstall, onInstall }) {
 
       <footer className="lp-foot">
         <strong>EcoScan — Prototipo académico de demostración.</strong>
-        <p>Las funciones, resultados de escaneo, estadísticas y ubicaciones de esta versión son simulados. No representan un servicio operativo ni información municipal validada.</p>
+        <p>Las estadísticas, usuarios y ubicaciones de esta versión son simulados, y los resultados de escaneo son estimaciones de un modelo de visión genérico que puede equivocarse. No representan un servicio operativo ni información municipal validada.</p>
       </footer>
     </div>
   )

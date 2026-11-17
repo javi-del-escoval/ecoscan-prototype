@@ -1,15 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { Badge, Card, StatCard, go } from '../components/ui'
 import PointsExplorer from '../components/PointsExplorer'
-import { scanResults, formatDateTime } from '../data/demoData'
-
-const SAMPLE_IMG = 'data:image/svg+xml;utf8,' + encodeURIComponent(
-  `<svg xmlns="http://www.w3.org/2000/svg" width="480" height="360" viewBox="0 0 480 360">
-    <rect width="480" height="360" fill="#E8EFE9"/>
-    <rect x="205" y="60" width="70" height="40" rx="8" fill="#9BB7A8"/>
-    <path d="M215 100h50l22 50v150a14 14 0 0 1-14 14H207a14 14 0 0 1-14-14V150z" fill="#B8D1C3" stroke="#7FA390" stroke-width="4"/>
-    <text x="240" y="335" font-family="sans-serif" font-size="18" text-anchor="middle" fill="#4B5D53">Imagen de ejemplo</text>
-  </svg>`)
+import { formatDateTime, binColor, materialName } from '../data/demoData'
+import { loadModel, classify, buildResult } from '../lib/vision'
 
 export function CitizenHome({ user, history, stats, onNotify }) {
   const mine = history.filter((h) => h.user === user.name).slice(0, 3)
@@ -22,7 +15,7 @@ export function CitizenHome({ user, history, stats, onNotify }) {
       <div className="cta">
         <div>
           <strong>Escanear un residuo</strong>
-          <p>Toma una foto o elige una imagen y recibe una clasificación simulada.</p>
+          <p>Abre la cámara o sube una foto y recibe una clasificación estimada con visión por computador.</p>
         </div>
         <button className="btn btn--accent btn--lg" onClick={() => go('/c/scan')}>Escanear residuo</button>
       </div>
@@ -60,59 +53,132 @@ function HistoryRow({ h }) {
   )
 }
 
-export function ScanPage({ onScan }) {
-  const [img, setImg] = useState(null) // { url, sample }
-  const [loading, setLoading] = useState(false)
-  const timer = useRef()
-  useEffect(() => () => clearTimeout(timer.current), [])
+export function ScanPage({ points, atPointId, setAtPointId, onScan }) {
+  const videoRef = useRef(null)
+  const streamRef = useRef(null)
+  const [cam, setCam] = useState('starting') // starting | live | denied | unsupported
+  const [facing, setFacing] = useState('environment')
+  const [captured, setCaptured] = useState(null) // URL de la imagen en análisis
+  const [busy, setBusy] = useState(false)
+  const [model, setModel] = useState('loading') // loading | ready | error
+  const [error, setError] = useState('')
 
-  const pick = (e) => {
+  // Precarga el modelo mientras se muestra la cámara
+  const warm = () => { setModel('loading'); loadModel().then(() => setModel('ready'), () => setModel('error')) }
+  useEffect(warm, [])
+
+  // La cámara se abre al entrar a la pestaña y se apaga al salir o al capturar
+  useEffect(() => {
+    if (captured) return
+    if (!navigator.mediaDevices?.getUserMedia) { setCam('unsupported'); return }
+    let cancelled = false
+    setCam('starting')
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: facing } }, audio: false })
+      .then((stream) => {
+        if (cancelled) { stream.getTracks().forEach((t) => t.stop()); return }
+        streamRef.current = stream
+        videoRef.current.srcObject = stream
+        setCam('live')
+      })
+      .catch(() => { if (!cancelled) setCam('denied') })
+    return () => {
+      cancelled = true
+      streamRef.current?.getTracks().forEach((t) => t.stop())
+      streamRef.current = null
+    }
+  }, [facing, captured])
+
+  async function analyze(source, url) {
+    setError('')
+    setCaptured(url)
+    setBusy(true)
+    try {
+      const preds = await classify(source)
+      onScan(buildResult(preds), url, atPointId)
+    } catch {
+      setError('No se pudo analizar la imagen. El modelo de visión necesita conexión a internet la primera vez que se usa.')
+      setModel('error')
+      setBusy(false)
+    }
+  }
+  function capture() {
+    const v = videoRef.current
+    const c = document.createElement('canvas')
+    c.width = v.videoWidth; c.height = v.videoHeight
+    c.getContext('2d').drawImage(v, 0, 0)
+    analyze(c, c.toDataURL('image/jpeg', 0.85))
+  }
+  async function fromGallery(e) {
     const f = e.target.files?.[0]
-    if (!f) return
-    // La imagen solo se previsualiza en el navegador; no se sube ni se guarda.
-    setImg({ url: URL.createObjectURL(f), sample: false })
     e.target.value = ''
+    if (!f) return
+    // La imagen se procesa en el navegador; no se sube ni se guarda.
+    const url = URL.createObjectURL(f)
+    const img = new Image()
+    img.src = url
+    try { await img.decode() } catch { setError('No se pudo leer la imagen seleccionada.'); return }
+    analyze(img, url)
   }
-  const analyze = () => {
-    setLoading(true)
-    timer.current = setTimeout(() => {
-      const result = scanResults[Math.floor(Math.random() * scanResults.length)]
-      onScan(result, img?.url ?? SAMPLE_IMG, !img || img.sample)
-    }, 1200 + Math.random() * 600)
-  }
+  const retake = () => { setCaptured(null); setBusy(false); setError('') }
+  const activePoints = points.filter((p) => p.status === 'Active')
 
   return (
     <div className="stack">
       <h1>Escanear residuo</h1>
-      <p className="lead">Toma una foto o selecciona una imagen. El análisis es una simulación del prototipo.</p>
-      <Card>
-        <div className="preview">
-          {img ? <img src={img.url} alt={img.sample ? 'Imagen de ejemplo' : 'Vista previa de la imagen seleccionada'} /> : <div className="preview__empty">Aún no has seleccionado una imagen</div>}
-          {loading && <div className="preview__loading" role="status"><span className="spinner" />Analizando residuo…</div>}
-        </div>
+      <div className="stage">
+        {captured ? (
+          <img src={captured} alt="Imagen en análisis" />
+        ) : (
+          <video ref={videoRef} autoPlay playsInline muted aria-label="Vista de la cámara" />
+        )}
+        {!captured && cam === 'starting' && <div className="stage__msg" role="status">Abriendo cámara…</div>}
+        {!captured && cam === 'denied' && <div className="stage__msg" role="alert">No se pudo acceder a la cámara. Permite el acceso en tu navegador o sube una foto desde la galería.</div>}
+        {!captured && cam === 'unsupported' && <div className="stage__msg" role="alert">Este navegador no permite usar la cámara. Sube una foto desde la galería.</div>}
+        {busy && <div className="preview__loading" role="status"><span className="spinner" />{model === 'loading' ? 'Cargando modelo de visión…' : 'Analizando residuo…'}</div>}
+      </div>
+
+      {captured && !busy ? (
         <div className="row">
-          <label className="btn btn--outline">
-            Tomar foto
-            <input type="file" accept="image/*" capture="environment" onChange={pick} hidden disabled={loading} />
-          </label>
-          <label className="btn btn--outline">
-            Elegir imagen
-            <input type="file" accept="image/*" onChange={pick} hidden disabled={loading} />
-          </label>
-          <button className="btn btn--ghost" onClick={() => setImg({ url: SAMPLE_IMG, sample: true })} disabled={loading}>Usar imagen de ejemplo</button>
+          <button className="btn btn--primary" onClick={retake}>Volver a la cámara</button>
         </div>
-        <button className="btn btn--primary btn--lg btn--block" onClick={analyze} disabled={loading}>
-          {loading ? 'Analizando…' : 'Analizar residuo'}
-        </button>
-        <p className="small muted">La imagen no se envía ni se guarda en ningún servidor. {img ? '' : 'Si no eliges una imagen, se usará una imagen de ejemplo.'}</p>
+      ) : (
+        <div className="camctl">
+          <label className="btn btn--outline">
+            Subir desde la galería
+            <input type="file" accept="image/*" onChange={fromGallery} hidden disabled={busy} />
+          </label>
+          <button className="shutter" onClick={capture} disabled={cam !== 'live' || busy} aria-label="Capturar y analizar" />
+          <button className="btn btn--outline" onClick={() => setFacing((f) => (f === 'environment' ? 'user' : 'environment'))} disabled={cam !== 'live'}>Cambiar cámara</button>
+        </div>
+      )}
+      {error && <p className="notice" role="alert">{error}</p>}
+
+      <Card title="¿Estás en un punto de reciclaje?" note="Si eliges el punto, te indicaremos en qué contenedor (por color) va cada material según su configuración.">
+        <label className="field">
+          <span className="sr">Punto de reciclaje actual</span>
+          <select value={atPointId || ''} onChange={(e) => setAtPointId(e.target.value || null)}>
+            <option value="">No, estoy en otro lugar</option>
+            {activePoints.map((p) => <option key={p.id} value={p.id}>{p.name} · {p.municipality}</option>)}
+          </select>
+        </label>
+        <p className="small muted" style={{ margin: 0 }}>Ubicaciones de demostración. EcoScan no usa tu ubicación real.</p>
       </Card>
+
+      <p className="small muted">
+        {model === 'loading' && 'Modelo de visión: cargando (solo la primera vez, requiere conexión)…'}
+        {model === 'ready' && 'Modelo de visión listo. La imagen se analiza en tu dispositivo y no se envía a ningún servidor.'}
+        {model === 'error' && <>No se pudo cargar el modelo de visión. <button className="linkbtn" onClick={warm}>Reintentar</button></>}
+      </p>
     </div>
   )
 }
 
 export function ScanResult({ scan, points, onFind, onOpenPoint, onNotify }) {
   const [fb, setFb] = useState(null)
-  const { result: r, preview } = scan
+  const { result: r, preview, pointId } = scan
+  const atPoint = points.find((p) => p.id === pointId)
+  const accepted = atPoint && atPoint.status === 'Active' && atPoint.acceptedMaterialIds.includes(r.materialId)
+  const bin = accepted ? binColor(atPoint.binColors?.[r.materialId]) : null
   const near = points
     .filter((p) => p.status === 'Active' && p.acceptedMaterialIds.some((id) => r.acceptedMaterialIds.includes(id)))
     .sort((a, b) => (b.municipality === 'Providencia') - (a.municipality === 'Providencia'))
@@ -127,7 +193,7 @@ export function ScanResult({ scan, points, onFind, onOpenPoint, onNotify }) {
   return (
     <div className="stack">
       <h1>Resultado del escaneo</h1>
-      <p className="notice">Simulación para fines del prototipo — no es un análisis real de inteligencia artificial.</p>
+      <p className="notice">Resultado estimado por un modelo de visión (MobileNet) que se ejecuta en tu navegador. Puede equivocarse y la imagen no sale de tu dispositivo.</p>
       <Card>
         <div className="result">
           <img src={preview} alt="Imagen analizada" />
@@ -139,13 +205,31 @@ export function ScanResult({ scan, points, onFind, onOpenPoint, onNotify }) {
           </div>
         </div>
         <div className="confidence">
-          <div className="confidence__top"><span>Confianza simulada</span><strong>{r.confidence}%</strong></div>
-          <div className={'meter meter--' + tone} role="meter" aria-label="Confianza simulada" aria-valuemin="0" aria-valuemax="100" aria-valuenow={r.confidence}><span style={{ width: r.confidence + '%' }} /></div>
+          <div className="confidence__top"><span>Confianza del modelo</span><strong>{r.confidence}%</strong></div>
+          <div className={'meter meter--' + tone} role="meter" aria-label="Confianza del modelo" aria-valuemin="0" aria-valuemax="100" aria-valuenow={r.confidence}><span style={{ width: r.confidence + '%' }} /></div>
         </div>
       </Card>
+      {atPoint && (
+        <Card title={`Contenedor en ${atPoint.name}`} className="card--bin">
+          {bin ? (
+            <div className="bin">
+              <span className="bin__color" style={{ background: bin.hex }} aria-hidden="true" />
+              <div><strong>Deposítalo en el contenedor {bin.label.toLowerCase()}</strong><div className="muted">{r.material} · según la configuración de este punto</div></div>
+            </div>
+          ) : r.acceptedMaterialIds.length === 0 ? (
+            <p>Este material no tiene contenedor de reciclaje asignado. Sigue las instrucciones de abajo.</p>
+          ) : atPoint.acceptedMaterialIds.includes(r.materialId) ? (
+            <p>El punto tiene {materialName(r.materialId).toLowerCase()} configurado, pero no está activo ahora.</p>
+          ) : (
+            <p>Este punto <strong>no acepta</strong> {materialName(r.materialId).toLowerCase()}. Revisa los puntos sugeridos más abajo.</p>
+          )}
+          <p className="small muted" style={{ margin: '.5rem 0 0' }}>Configuración de ejemplo de demostración.</p>
+        </Card>
+      )}
       <Card title="Observación de contaminación visible" className={r.visibleContamination ? 'card--warn' : ''}>
         <p><strong>{r.condition}.</strong> {r.contaminationNote}</p>
         <p className="small muted">Una imagen no permite detectar contaminantes ocultos.</p>
+        {r.modelLabel && <p className="small muted" style={{ margin: 0 }}>Etiqueta detectada por el modelo: «{r.modelLabel}».</p>}
       </Card>
       <Card title="Cómo prepararlo" note={r.recommendation}>
         <ol className="instr">{r.instructions.map((i) => <li key={i}>{i}</li>)}</ol>
@@ -192,7 +276,7 @@ export function ScanHistory({ user, history }) {
             <li key={h.id} className="row-item">
               <div>
                 <strong>{h.material}</strong>
-                <div className="muted">{formatDateTime(h.date)} · Confianza simulada {h.confidence}%{h.isNew ? ' · Nuevo' : ''}</div>
+                <div className="muted">{formatDateTime(h.date)} · Confianza {h.confidence}%{h.isNew ? ' · Nuevo' : ''}</div>
               </div>
               <Badge>{h.status}</Badge>
             </li>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { users, STATUS_LABEL, fmt } from '../data/demoData'
+import { users, STATUS_LABEL, fmt, binColor, materialName } from '../data/demoData'
 
 export const go = (path) => { window.location.hash = '#' + path }
 
@@ -15,10 +15,27 @@ export function Wordmark({ light }) {
 const TONE = {
   Reciclable: 'ok', Active: 'ok',
   'Revisar condición': 'warn', 'Revisar aceptación local': 'warn', 'Needs review': 'warn',
-  Incierto: 'err', Inactive: 'muted',
+  Incierto: 'err', Inactive: 'muted', 'Residuo orgánico': 'warn',
 }
 export function Badge({ children, tone }) {
   return <span className={'badge badge--' + (tone || TONE[children] || 'muted')}>{STATUS_LABEL[children] ?? children}</span>
+}
+
+export function Swatch({ colorId }) {
+  const c = binColor(colorId)
+  return <span className="swatch" style={{ background: c ? c.hex : 'transparent' }} title={c ? c.label : 'Sin color'} aria-hidden="true" />
+}
+
+// Materiales aceptados con el color de contenedor configurado en el punto
+export function MatChips({ point }) {
+  return (
+    <span className="chips">
+      {point.acceptedMaterialIds.map((id) => {
+        const c = binColor(point.binColors?.[id])
+        return <span key={id} className="chip"><Swatch colorId={point.binColors?.[id]} />{materialName(id)}{c ? ` · ${c.label}` : ''}</span>
+      })}
+    </span>
+  )
 }
 
 export function StatCard({ label, value, sub }) {

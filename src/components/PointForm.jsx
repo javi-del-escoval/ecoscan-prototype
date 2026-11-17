@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { Modal } from './ui'
-import { acceptableMaterials, MUNICIPALITIES, STATUSES, STATUS_LABEL } from '../data/demoData'
+import { Modal, Swatch } from './ui'
+import { acceptableMaterials, BIN_COLORS, MUNICIPALITIES, STATUSES, STATUS_LABEL } from '../data/demoData'
 
 function Field({ id, label, children, error }) {
   return (
@@ -16,11 +16,19 @@ function Field({ id, label, children, error }) {
 export default function PointForm({ point, limited, defaultMunicipality, onSave, onCancel }) {
   const [f, setF] = useState(point ?? {
     name: '', municipality: defaultMunicipality || MUNICIPALITIES[0], address: '', lat: '', lng: '',
-    openingHours: '', acceptedMaterialIds: [], status: 'Active', description: '',
+    openingHours: '', acceptedMaterialIds: [], binColors: {}, status: 'Active', description: '',
   })
   const [errors, setErrors] = useState({})
   const set = (k, v) => setF((s) => ({ ...s, [k]: v }))
-  const toggle = (id) => set('acceptedMaterialIds', f.acceptedMaterialIds.includes(id) ? f.acceptedMaterialIds.filter((x) => x !== id) : [...f.acceptedMaterialIds, id])
+  const toggle = (id) => {
+    const on = f.acceptedMaterialIds.includes(id)
+    setF((s) => ({
+      ...s,
+      acceptedMaterialIds: on ? s.acceptedMaterialIds.filter((x) => x !== id) : [...s.acceptedMaterialIds, id],
+      binColors: on ? s.binColors : { ...(s.binColors || {}), [id]: s.binColors?.[id] || 'verde' },
+    }))
+  }
+  const setColor = (id, c) => set('binColors', { ...(f.binColors || {}), [id]: c })
 
   function submit(e) {
     e.preventDefault()
@@ -34,13 +42,13 @@ export default function PointForm({ point, limited, defaultMunicipality, onSave,
     if (f.lng === '' || Number.isNaN(lng) || lng < -180 || lng > 180) er.lng = 'Longitud válida requerida (ej. -70.6168).'
     setErrors(er)
     if (Object.keys(er).length) return
-    onSave({ ...f, name: f.name.trim(), address: f.address.trim(), openingHours: f.openingHours.trim(), description: f.description.trim(), lat, lng })
+    onSave({ ...f, binColors: Object.fromEntries(f.acceptedMaterialIds.map((id) => [id, f.binColors?.[id] || 'verde'])), name: f.name.trim(), address: f.address.trim(), openingHours: f.openingHours.trim(), description: f.description.trim(), lat, lng })
   }
 
   return (
     <Modal title={point ? `Editar punto · ${point.id}` : 'Nuevo punto de reciclaje'} onClose={onCancel}>
       <form onSubmit={submit} noValidate className="form">
-        {limited && <p className="card__note">Como municipalidad puedes editar horario, materiales aceptados y estado operativo.</p>}
+        {limited && <p className="card__note">Como municipalidad puedes editar horario, materiales aceptados, colores de contenedor y estado operativo.</p>}
         <Field id="pf-name" label="Nombre *" error={errors.name}>
           <input id="pf-name" value={f.name} disabled={limited} onChange={(e) => set('name', e.target.value)} aria-invalid={!!errors.name} />
         </Field>
@@ -83,6 +91,22 @@ export default function PointForm({ point, limited, defaultMunicipality, onSave,
           </div>
           {errors.materials && <p className="field__err">{errors.materials}</p>}
         </fieldset>
+        {f.acceptedMaterialIds.length > 0 && (
+          <fieldset className="field">
+            <legend>Color del contenedor por material</legend>
+            <div className="colorrows">
+              {f.acceptedMaterialIds.map((id) => (
+                <div key={id} className="colorrow">
+                  <Swatch colorId={f.binColors?.[id]} />
+                  <label htmlFor={'pf-color-' + id}>{acceptableMaterials.find((m) => m.id === id)?.name}</label>
+                  <select id={'pf-color-' + id} value={f.binColors?.[id] || 'verde'} onChange={(e) => setColor(id, e.target.value)}>
+                    {BIN_COLORS.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+                  </select>
+                </div>
+              ))}
+            </div>
+          </fieldset>
+        )}
         {!limited && (
           <Field id="pf-desc" label="Descripción">
             <textarea id="pf-desc" rows="2" value={f.description} onChange={(e) => set('description', e.target.value)} />

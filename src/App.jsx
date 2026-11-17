@@ -29,6 +29,7 @@ export default function App() {
   const [points, setPoints] = useState(recyclingPoints)
   const [lastScan, setLastScan] = useState(null)
   const [focus, setFocus] = useState(null)
+  const [atPointId, setAtPointId] = useState(null) // punto de reciclaje donde está la persona
   const [viewed, setViewed] = useState(() => new Set())
   const [editing, setEditing] = useState(null) // punto | 'new' | null
   const [toast, setToast] = useState('')
@@ -59,7 +60,7 @@ export default function App() {
   const selectRole = (id) => { setRole(id); go(users[id].home) }
 
   // --- Acciones de datos (solo estado local) ---
-  function onScan(result, preview) {
+  function onScan(result, preview, pointId) {
     const now = new Date()
     const pad = (n) => String(n).padStart(2, '0')
     const entry = {
@@ -68,7 +69,7 @@ export default function App() {
       confidence: result.confidence, status: result.resultStatus, municipality: 'Providencia', isNew: true,
     }
     setHistory((h) => [entry, ...h])
-    setLastScan({ result, preview })
+    setLastScan({ result, preview, pointId })
     go('/c/result')
   }
   function savePoint(p) {
@@ -114,7 +115,7 @@ export default function App() {
     }
     let view
     if (page === 'home') view = <CitizenHome user={user} history={history} stats={stats} />
-    else if (page === 'scan') view = <ScanPage onScan={onScan} />
+    else if (page === 'scan') view = <ScanPage points={points} atPointId={atPointId} setAtPointId={setAtPointId} onScan={onScan} />
     else if (page === 'result') {
       if (!lastScan) { go('/c/scan'); return null }
       view = (

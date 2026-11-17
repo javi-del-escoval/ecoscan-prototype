@@ -76,6 +76,20 @@ export const scanResults = [
     instructions: ['Prueba con otra foto, con mejor luz y fondo liso.', 'Si el objeto combina materiales distintos, consulta la guía local de disposición.', 'No asumas que el objeto es reciclable a partir de este resultado.'],
     acceptedMaterialIds: [], resultStatus: 'Incierto',
   },
+  {
+    id: 'scan-hdpe', materialId: 'HDPE', material: 'Plástico HDPE', category: 'Plástico', confidence: 90,
+    condition: 'Condición no evaluada', visibleContamination: false, contaminationNote: '',
+    recommendation: 'Reciclable en puntos que acepten HDPE.',
+    instructions: ['Vacía el envase por completo.', 'Enjuágalo si quedan restos.', 'Revisa que el punto elegido acepte HDPE.'],
+    acceptedMaterialIds: ['HDPE'], resultStatus: 'Reciclable',
+  },
+  {
+    id: 'scan-organic', materialId: 'ORGANIC', material: 'Residuo orgánico', category: 'Orgánico', confidence: 90,
+    condition: 'Condición no evaluada', visibleContamination: false, contaminationNote: '',
+    recommendation: 'No va en un contenedor de reciclaje estándar.',
+    instructions: ['Usa una opción de recolección o compostaje de orgánicos.', 'No lo mezcles con envases reciclables.'],
+    acceptedMaterialIds: [], resultStatus: 'Residuo orgánico',
+  },
 ]
 
 export const initialHistory = [
@@ -93,7 +107,7 @@ export const initialHistory = [
   { id: 'H012', user: 'Martín Pérez', material: 'Plástico PET', materialId: 'PET', date: '2026-11-05T09:26', confidence: 92, status: 'Reciclable', municipality: 'Ñuñoa' },
 ]
 
-export const recyclingPoints = [
+const pointsBase = [
   {
     id: 'PVD-001', name: 'Punto Verde Plaza Central', municipality: 'Providencia',
     address: 'Sector Plaza de la Aviación, Providencia, Santiago', lat: -33.4289, lng: -70.6168,
@@ -131,6 +145,29 @@ export const recyclingPoints = [
     status: 'Needs review', lastUpdated: '2026-10-28', description: 'Punto de ejemplo incluido para demostrar el estado «Requiere revisión».',
   },
 ]
+
+// Colores de contenedor por material, configurables por cada punto
+export const BIN_COLORS = [
+  { id: 'verde', label: 'Verde', hex: '#2E9B5E' },
+  { id: 'azul', label: 'Azul', hex: '#2F6FDB' },
+  { id: 'amarillo', label: 'Amarillo', hex: '#F2C230' },
+  { id: 'rojo', label: 'Rojo', hex: '#D64545' },
+  { id: 'naranja', label: 'Naranja', hex: '#EE8A2B' },
+  { id: 'gris', label: 'Gris', hex: '#8A949B' },
+  { id: 'blanco', label: 'Blanco', hex: '#FFFFFF' },
+  { id: 'negro', label: 'Negro', hex: '#2B2B2B' },
+  { id: 'cafe', label: 'Café', hex: '#8B5A2B' },
+]
+export const binColor = (id) => BIN_COLORS.find((c) => c.id === id)
+const seedColors = {
+  'PVD-001': { PET: 'amarillo', HDPE: 'amarillo', PAPER: 'azul', ALU: 'gris', GLASS: 'verde' },
+  'PVD-002': { PET: 'amarillo', HDPE: 'amarillo', ALU: 'gris', CARTON: 'naranja' },
+  'PVD-003': { PET: 'amarillo', PAPER: 'azul', GLASS: 'verde', ALU: 'rojo' },
+  'NUN-001': { PET: 'amarillo', HDPE: 'amarillo', PAPER: 'azul', ALU: 'gris', GLASS: 'verde' },
+  'STG-001': { PET: 'amarillo', PAPER: 'azul', ALU: 'gris', CARTON: 'naranja' },
+  'PVD-004': { PAPER: 'azul', GLASS: 'verde' },
+}
+export const recyclingPoints = pointsBase.map((p) => ({ ...p, binColors: seedColors[p.id] }))
 
 export const STATUS_LABEL = { Active: 'Activo', Inactive: 'Inactivo', 'Needs review': 'Requiere revisión' }
 export const STATUSES = Object.keys(STATUS_LABEL)

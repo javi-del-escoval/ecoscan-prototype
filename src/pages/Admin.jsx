@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
-import { Badge, BarList, Card, DemoNote, LineChart, StackedBar, StatCard } from '../components/ui'
-import { acceptableMaterials, adminStats, formatDate, formatDateTime, materialName } from '../data/demoData'
+import { Badge, BarList, MatChips, Card, DemoNote, LineChart, StackedBar, StatCard } from '../components/ui'
+import { acceptableMaterials, adminStats, formatDate, formatDateTime } from '../data/demoData'
 
 export function AdminDashboard({ points, extra }) {
   const s = adminStats
@@ -55,7 +55,7 @@ export function AdminScans({ history }) {
   return (
     <div className="stack">
       <h1>Escaneos</h1>
-      <DemoNote>Eventos de escaneo de ejemplo y simulados.</DemoNote>
+      <DemoNote>Eventos de escaneo de ejemplo (más los escaneos realizados en esta sesión).</DemoNote>
       <div className="filters">
         <label>Material
           <select value={mat} onChange={(e) => setMat(e.target.value)}>
@@ -70,7 +70,7 @@ export function AdminScans({ history }) {
       <Card>
         <div className="tablewrap">
           <table>
-            <thead><tr><th>Fecha</th><th>Material</th><th>Confianza simulada</th><th>Estado</th><th>Municipalidad</th><th>Usuario</th></tr></thead>
+            <thead><tr><th>Fecha</th><th>Material</th><th>Confianza</th><th>Estado</th><th>Municipalidad</th><th>Usuario</th></tr></thead>
             <tbody>
               {rows.map((h) => (
                 <tr key={h.id}>
@@ -110,7 +110,7 @@ export function AdminPoints({ points, onEdit, onNew, onToggle }) {
                   <td><strong>{p.name}</strong><div className="muted small">{p.id}</div></td>
                   <td>{p.municipality}</td>
                   <td><Badge>{p.status}</Badge></td>
-                  <td><span className="chips">{p.acceptedMaterialIds.map((id) => <span key={id} className="chip">{materialName(id)}</span>)}</span></td>
+                  <td><MatChips point={p} /></td>
                   <td>{formatDate(p.lastUpdated)}</td>
                   <td>
                     <div className="row row--tight">

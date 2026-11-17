@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import RecyclingMap from './RecyclingMap'
-import { Badge, Modal } from './ui'
-import { acceptableMaterials, materialName, MUNICIPALITIES, STATUSES, STATUS_LABEL, formatDate } from '../data/demoData'
+import { Badge, MatChips, Modal } from './ui'
+import { acceptableMaterials, MUNICIPALITIES, STATUSES, STATUS_LABEL, formatDate } from '../data/demoData'
 
 // Mapa / lista de puntos con filtros y detalle. Lo usan ciudadanía y municipalidad.
 export default function PointsExplorer({ points, lockMunicipality, emphasize, canEdit, onEdit, onView, focus }) {
@@ -87,7 +87,7 @@ export default function PointsExplorer({ points, lockMunicipality, emphasize, ca
                 <Badge>{p.status}</Badge>
               </span>
               <span className="muted">{p.municipality}{emphasize && p.municipality === emphasize ? ' · Cercano' : ''}</span>
-              <span className="chips">{p.acceptedMaterialIds.map((id) => <span key={id} className="chip">{materialName(id)}</span>)}</span>
+              <MatChips point={p} />
             </button>
           ))}
         </div>
@@ -101,8 +101,8 @@ export default function PointsExplorer({ points, lockMunicipality, emphasize, ca
             <dl>
               <dt>Dirección</dt><dd>{selected.address}</dd>
               <dt>Horario</dt><dd>{selected.openingHours}</dd>
-              <dt>Materiales aceptados</dt>
-              <dd className="chips">{selected.acceptedMaterialIds.map((id) => <span key={id} className="chip">{materialName(id)}</span>)}</dd>
+              <dt>Materiales y color de contenedor</dt>
+              <dd><MatChips point={selected} /></dd>
               <dt>Última actualización</dt><dd>{formatDate(selected.lastUpdated)}</dd>
             </dl>
             <p className="demo-note">Ubicación de demostración — no es una instalación operativa verificada.</p>
